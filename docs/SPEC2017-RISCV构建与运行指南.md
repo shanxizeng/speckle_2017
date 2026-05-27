@@ -29,28 +29,72 @@ export RISCV=/opt/riscv-toolchain
 
 ```bash
 ./gen_binaries.sh --compile [--suite <套件>] [--input <输入集>]
+./gen_binaries.sh --genCommands [--suite <套件>] [--input <输入集>]
 ```
 
-| 参数 | 可选值 | 默认值 |
-|---|---|---|
-| `--suite` | intspeed, intrate, fpspeed, fprate | intspeed |
-| `--input` | test, train, ref | ref |
+| 参数 | 可选值 | 默认值 | 说明 |
+|---|---|---|---|
+| `--suite` | intspeed, intrate, fpspeed, fprate | intspeed | 基准测试套件 |
+| `--input` | test, train, ref | ref | 输入数据集规模 |
+| `--compile` | — | — | 编译 + 打包 |
+| `--genCommands` | — | — | 生成 `.cmd` 命令文件 |
 
-### 构建全部 4 个套件（ref）
+### 构建流程（单次 `--compile` 内部做的事）
+
+1. **复制配置文件** — 将 `riscv.cfg` 和 `host.cfg` 拷贝到 `$SPEC_DIR/config/`
+2. **RISC-V target build** — 调用 `runcpu --config riscv --action build`，用交叉编译器生成 RISC-V 二进制，产物在 `$SPEC_DIR/benchspec/CPU/<benchmark>/exe/`
+3. **Host build + 输入生成** — 调用 `runcpu --config host --action runsetup`，用主机编译器编译并**执行**输入生成程序（生成几 GB 的输入数据），产物在 `$SPEC_DIR/benchspec/CPU/<benchmark>/run/`
+4. **打包 overlay** — 遍历 `commands/<suite>/` 下的 `.cmd` 文件，对每个 benchmark：
+   - 拷贝 host run 目录中的输入文件
+   - 拷贝 RISC-V 二进制替换主机二进制
+   - 生成 `run.sh` 和 `run_workloadN.sh`
+   - 若 RISC-V 二进制或 host run 目录不存在则跳过（打印 WARNING）
+5. **复制套件脚本** — 将 `spec17-run-scripts/<suite>.sh` 和 `run_perf.sh` 复制到 overlay
+
+### 一次性构建全部 4 个套件 × 3 种输入
 
 ```bash
-for suite in intspeed fpspeed intrate fprate; do
-    ./gen_binaries.sh --compile --suite $suite --input ref
-done
+# 1. int 套件直接构建（已有 test/train/ref 的 cmd 文件）
+./gen_binaries.sh --compile --suite intspeed --input test
+./gen_binaries.sh --compile --suite intspeed --input train
+./gen_binaries.sh --compile --suite intspeed --input ref
+
+./gen_binaries.sh --compile --suite intrate --input test
+./gen_binaries.sh --compile --suite intrate --input train
+./gen_binaries.sh --compile --suite intrate --input ref
+
+# 2. fp 套件：先生成 train 的 cmd 文件，再构建
+# 仓库里可能已经存在这些cmd文件，按照需求决定是否重建
+./gen_binaries.sh --genCommands --suite fpspeed --input train
+./gen_binaries.sh --genCommands --suite fprate --input train
+
+./gen_binaries.sh --compile --suite fpspeed --input test
+./gen_binaries.sh --compile --suite fpspeed --input train
+./gen_binaries.sh --compile --suite fpspeed --input ref
+
+./gen_binaries.sh --compile --suite fprate --input test
+./gen_binaries.sh --compile --suite fprate --input train
+./gen_binaries.sh --compile --suite fprate --input ref
 ```
 
-耗时约 30-60 分钟（取决于机器性能），主要消耗在 Fortran benchmark 的交叉编译上。
+### 构建耗时估算
 
-### 构建流程
+| 套件 | C/C++ (~10个) | Fortran (~10-13个) |
+|---|---|---|
+| intspeed / intrate | ~8 分钟 | — |
+| fpspeed / fprate | — | ~30-35 分钟 |
 
-1. **RISC-V target build** — 用 `riscv.cfg` 交叉编译出 RISC-V 二进制（`--action build`）
-2. **Host build** — 用 `host.cfg` 在 x86 主机上编译并执行输入生成程序（`--action runsetup`）
-3. **打包** — 将主机生成的输入文件 + RISC-V 二进制合并到 `build/overlay/`
+- `test` 和 `train` 的编译时间与 `ref` 基本一致（因为 benchmark 数量相同，编译产物不复用）
+- 全部 12 个组合（4 套件 × 3 输入，fp 套件无 train 时为 10 组合）总计约 **2-3 小时**
+
+### 构建后覆盖情况
+
+| 套件 | test | train | ref |
+|---|---|---|---|
+| intspeed | 10 | 10 | 10 |
+| intrate | 10 | 10 | 10 |
+| fpspeed | 10 | 需 `--genCommands` 后构建 | 10 |
+| fprate | 13 | 需 `--genCommands` 后构建 | 13 |
 
 ### 修复的问题
 
