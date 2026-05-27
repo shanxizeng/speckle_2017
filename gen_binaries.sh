@@ -126,6 +126,14 @@ if [ "$compileFlag" = true ]; then
          host_bmk_dir=${bmark_base_dir}/run/run_base_${input_type}_${H_CONFIG}-m64.0000;
       fi
 
+      # Skip benchmarks that weren't built (no run directory)
+      if [ ! -d "$host_bmk_dir" ]; then
+         echo "WARNING: Skipping $b - host run directory not found: $host_bmk_dir"
+         continue
+      fi
+
+      mkdir -p $output_dir
+
       # Copy the inputs from the host build
       inputs=$(find "$host_bmk_dir"/* -maxdepth 0 ! -executable -o -type d)
       for input in ${inputs[@]}; do
@@ -134,10 +142,16 @@ if [ "$compileFlag" = true ]; then
       done
 
       if [[ $b == "523.xalancbmk_r" ]]; then
-         target_bin=`find $bmark_base_dir/exe/ -name "cpuxalan*${CONFIG}-64"`
+         target_bin=`find $bmark_base_dir/exe/ -name "cpuxalan*${CONFIG}-64" 2>/dev/null`
       else
-         target_bin=`find $bmark_base_dir/exe/ -name "*${b_short_name}*${CONFIG}-64"`
+         target_bin=`find $bmark_base_dir/exe/ -name "*${b_short_name}*${CONFIG}-64" 2>/dev/null`
       fi
+
+      if [ -z "$target_bin" ]; then
+         echo "WARNING: Skipping $b - no target binary found in $bmark_base_dir/exe/"
+         continue
+      fi
+
       cp -f ${target_bin} $output_dir/
 
       # Generate a run script
@@ -166,8 +180,14 @@ if [ "$compileFlag" = true ]; then
       done
       chmod +x $run_script
    done
-   # Copy the master runscript into the overlay directory
-   cp ${build_dir}/../spec17-run-scripts/${suite_type}.sh ${overlay_dir}/${suite_type}/${input_type}
+   # Copy the master runscript into the overlay directory (if it exists)
+   if [ -f ${build_dir}/../spec17-run-scripts/${suite_type}.sh ]; then
+      cp ${build_dir}/../spec17-run-scripts/${suite_type}.sh ${overlay_dir}/${suite_type}/${input_type}
+   fi
+   # Copy run_perf.sh to overlay root (once per build)
+   if [ -f ${build_dir}/../run_perf.sh ]; then
+      cp ${build_dir}/../run_perf.sh ${overlay_dir}/
+   fi
 
 fi
 
