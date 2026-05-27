@@ -1,0 +1,3 @@
+[submodule "tools/boom_stop"]
+	path = tools/boom_stop
+	url = https://github.com/Shuiliusheng/boom_stop.git
