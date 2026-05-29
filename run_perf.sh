@@ -136,7 +136,7 @@ function run_workload {
 
     # 构建新的 samplectrl 参数文件，修改 logname
     local tmp_params="${OUTPUT_DIR}/.tmp_samplectrl_$$.txt"
-    sed "s/^logname:.*/logname: ${log_file}/" "$PARAMS" > "$tmp_params"
+    sed "s|^logname:.*|logname: ${log_file}|" "$PARAMS" > "$tmp_params"
 
     (
         cd "$bmark_dir" || exit 1
