@@ -207,13 +207,13 @@ if [ "$ALL_MODE" = true ]; then
     fi
 
     for suite in "${SUITE_TYPES[@]}"; do
-        local dir="${suite}/${INPUT_TYPE}"
+        dir="${suite}/${INPUT_TYPE}"
         if [ ! -d "$dir" ]; then
             echo "WARNING: suite directory not found: $dir, skipping"
             continue
         fi
         echo "### Suite: ${suite}/${INPUT_TYPE} ###"
-        local benchmarks=$(find_benchmarks_in_dir "$dir")
+        benchmarks=$(find_benchmarks_in_dir "$dir")
         for b in $benchmarks; do
             run_benchmark "${dir}/${b}"
             echo ""
@@ -229,9 +229,9 @@ else
 
     if [ ${#SUITE_TYPES[@]} -eq 0 ]; then
         # 未指定套件，尝试在常见位置查找
-        local found=false
+        found=false
         for s in "${ALL_SUITES[@]}"; do
-            local dir="${s}/${INPUT_TYPE}"
+            dir="${s}/${INPUT_TYPE}"
             if [ -d "${dir}/${BENCHMARK}" ]; then
                 run_benchmark "${dir}/${BENCHMARK}"
                 found=true
@@ -252,7 +252,7 @@ else
         fi
     else
         for suite in "${SUITE_TYPES[@]}"; do
-            local dir="${suite}/${INPUT_TYPE}"
+            dir="${suite}/${INPUT_TYPE}"
             if [ -d "${dir}/${BENCHMARK}" ]; then
                 run_benchmark "${dir}/${BENCHMARK}"
                 total=1
